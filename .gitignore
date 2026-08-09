@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --------------------------------------------------------------------------
+# Oversized artifacts excluded per GitHub's 100 MB/file hard limit
+# (documented in README.md "Models Not Shipped in This Repository" and in
+# data/README.md / notebooks -- regenerate via train.py or fetch via Git LFS
+# / the Hugging Face Hub if your team hosts them there).
+# --------------------------------------------------------------------------
+
+# Random Forest (TF-IDF) grid-search model -- ~167 MB. Regenerate via
+# `train.py --model random_forest` (see notebook cell training rf_grid_best).
+artifacts/rf_grid_best.pkl
+
+# Fine-tuned BERT weights -- ~418 MB. Regenerate via `train.py --model bert`,
+# or host externally (Git LFS / Hugging Face Hub) and place at
+# models/model_bert/model.safetensors. models/model_bert/config.json IS
+# shipped (small, useful on its own for architecture/label-mapping reference).
+models/model_bert/model.safetensors
+models/model_bert/pytorch_model.bin
+
+# HuggingFace Trainer checkpoints (~3.7 GB total across 3 checkpoints:
+# optimizer/scheduler/rng state + full model weights per epoch). Only the
+# small trainer_state.json files (real logged eval metrics) are kept, copied
+# out to results/bert_trainer_state_checkpoint-*.json -- see README.
+results/checkpoint-*/
+
+# fastText language-ID model (~131 MB) used by the "Language Detection and
+# Voting" section -- a well-known public file, not redistributed here.
+# Download: https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
+lid.176.bin
+
+# GloVe vectors downloaded on first use via gensim.downloader (glove-wiki-gigaword-200,
+# ~660 MB) -- never written into this repo, but ignored defensively in case a
+# local run caches them here.
+*.glove.gz
+gensim-data/
+
+# ONNX export output (optional, notebook-only; not shipped -- see requirements.txt)
+onnx_model/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NOTE: data/*.txt (train/val/test), artifacts/dt_best.pkl, artifacts/svc_grid_best.pkl,
+# artifacts/my_bpe_tokenizer*.json, artifacts/model_bert_tokenizer/, models/best_model_nn.pt,
+# and models/model_glove.pt are intentionally NOT ignored -- they are small enough to version
+# directly. See README.md "Project Structure" / "Models Not Shipped in This Repository".

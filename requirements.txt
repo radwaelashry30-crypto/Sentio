@@ -1,0 +1,53 @@
+torch>=2.2,<3.0
+numpy>=1.26,<2.0
+pandas>=2.0,<3.0
+scikit-learn>=1.3,<2.0
+scipy>=1.11,<2.0
+nltk>=3.8,<4.0
+joblib>=1.3,<2.0
+tqdm>=4.66,<5.0
+matplotlib>=3.7,<4.0
+seaborn>=0.13,<0.14
+plotly>=5.20,<6.0
+pytest>=7.4,<9.0
+
+# Tokenization / augmentation / language ID (all used by the notebook's
+# preprocessing and BPE-tokenization cells)
+#
+# IMPORTANT (verified empirically while building this repo, not a guess):
+# artifacts/my_bpe_tokenizer.json and my_bpe_tokenizer_aug.json were written by
+# a `tokenizers` release new enough to serialize BPE merges as [a, b] pairs;
+# tokenizers==0.19.x expects the older "a b" string format and raises
+# `Exception: data did not match any variant of untagged enum ModelWrapper`
+# trying to load them. tokenizers>=0.20 loads them correctly.
+tokenizers>=0.20,<1.0
+nlpaug>=1.1,<2.0
+langdetect>=1.0.9,<2.0
+langid>=1.1.6,<2.0
+fasttext-wheel>=0.9.2,<1.0   # fasttext's official PyPI package fails to build on some
+                              # platforms; fasttext-wheel ships prebuilt wheels. Requires
+                              # lid.176.bin separately -- see README/data/README.md.
+
+# Transformers / BERT fine-tuning path.
+# NOTE: transformers==4.40.x hard-pins tokenizers<0.20, which directly
+# conflicts with the tokenizers>=0.20 requirement above -- confirmed via
+# `pip install` (ImportError at transformers import time). transformers>=4.45
+# relaxes that pin and was verified to import and load
+# artifacts/model_bert_tokenizer/ cleanly (via AutoTokenizer, not the slow
+# BertTokenizer -- see README "Notebook Fidelity Notes" for why).
+transformers>=4.45,<5.0
+datasets>=2.19,<3.0
+
+# GloVe embeddings (glove-wiki-gigaword-200, downloaded on first use via
+# gensim.downloader -- ~660 MB, not shipped in this repo)
+gensim>=4.3,<5.0
+
+# Optional: word clouds in the notebook's EDA section only (skipped
+# automatically by the viz toolkit if not installed; not required by
+# train.py / evaluate.py / inference.py)
+wordcloud>=1.9,<2.0
+
+# Optional: only needed to re-run the notebook's ONNX export cell for the
+# fine-tuned BERT model; not required by any script in this repository.
+onnx>=1.16,<2.0
+onnxruntime>=1.18,<2.0
