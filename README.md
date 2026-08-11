@@ -23,6 +23,13 @@ This README states the product page's number as *the product's own claim*
 and separately reports what was verified from the notebook -- it does not
 assume they are computed on identical splits.
 
+**Serving layer:** [`backend/`](backend/) is the FastAPI service the live
+demo calls (`POST /predict`), merged into this repository from a
+previously separate `sentio-api` repo. **It currently serves an untrained
+classification head, not the fine-tuned checkpoint reported below** --
+see [`backend/README.md`](backend/README.md#known-issue-served-weights-are-not-the-fine-tuned-checkpoint)
+for why and how to fix it.
+
 ---
 
 ## Project Overview
@@ -426,6 +433,15 @@ Sentio/
 │   └── test.txt
 ├── tests/
 │   └── test_inference.py
+├── backend/                         # FastAPI serving layer -- see backend/README.md
+│   ├── README.md
+│   ├── main.py                      # FastAPI app: /health, /predict
+│   ├── inference.py                 # SentioModel -- loads model_bert/, tokenizes, predicts
+│   ├── clean_text.py
+│   ├── download_model.py            # fetches BERT checkpoint at Docker build time (see backend/README.md)
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── model_bert/                  # config + tokenizer (weights downloaded at build time)
 └── ReviewSense_AI_Report.docx      # original written project report
 ```
 

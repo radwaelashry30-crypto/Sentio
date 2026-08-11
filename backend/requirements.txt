@@ -1,0 +1,6 @@
+torch>=2.2,<3.0
+transformers>=4.45,<5.0
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.29,<1.0
+python-multipart>=0.0.9,<1.0
+nltk>=3.8,<4.0

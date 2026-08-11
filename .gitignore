@@ -41,6 +41,13 @@ artifacts/rf_grid_best.pkl
 models/model_bert/model.safetensors
 models/model_bert/pytorch_model.bin
 
+# backend/model_bert/ weights are downloaded at Docker build time by
+# backend/download_model.py -- see backend/README.md "Known Issue" for why
+# this currently downloads an untrained classification head, not the
+# fine-tuned checkpoint above.
+backend/model_bert/model.safetensors
+backend/model_bert/pytorch_model.bin
+
 # HuggingFace Trainer checkpoints (~3.7 GB total across 3 checkpoints:
 # optimizer/scheduler/rng state + full model weights per epoch). Only the
 # small trainer_state.json files (real logged eval metrics) are kept, copied
