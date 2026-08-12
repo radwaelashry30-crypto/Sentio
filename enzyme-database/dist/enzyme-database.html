@@ -1831,13 +1831,16 @@ function recordSearchableText(r) {
 
 /** Keyword retrieval: score every record by query-term overlap, return the top N.
  *  Returns an empty match list (never a misleading arbitrary fallback) when
- *  the query has real terms but none of them actually appear in any record. */
-function retrieveRelevantRecords(question, records, topN = 20) {
+ *  the query has real terms but none of them actually appear in any record.
+ *  `matchCount` is the TRUE number of records that matched, before topN
+ *  truncation -- callers must use that for "N of M match" reporting, not
+ *  matches.length, or a truncated result silently undercounts itself. */
+function retrieveRelevantRecords(question, records, topN = 200) {
   const allTerms = tokenize(question);
   const terms = allTerms.filter((t) => !STOPWORDS.has(t) && t.length > 1);
 
   if (terms.length === 0) {
-    return { matches: [], terms: [], noUsableTerms: true };
+    return { matches: [], matchCount: 0, terms: [], noUsableTerms: true };
   }
 
   const scored = records.map((r) => {
@@ -1852,7 +1855,7 @@ function retrieveRelevantRecords(question, records, topN = 20) {
 
   scored.sort((a, b) => b.score - a.score);
   const withHits = scored.filter((s) => s.score > 0);
-  return { matches: withHits.slice(0, topN).map((s) => s.r), terms, noUsableTerms: false };
+  return { matches: withHits.slice(0, topN).map((s) => s.r), matchCount: withHits.length, terms, noUsableTerms: false };
 }
 
 function mostCommon(values) {
@@ -1863,12 +1866,14 @@ function mostCommon(values) {
   return best ? { value: best, count: bestCount } : null;
 }
 
-/** A short, deterministic (rule-based, not AI-generated) summary of the matches. */
-function summarize(matches, totalCount, terms, noUsableTerms) {
+/** A short, deterministic (rule-based, not AI-generated) summary of the matches.
+ *  `matchCount` is the true total (pre-truncation); `matches` is what's actually
+ *  being returned/rendered, which may be fewer if it was capped by topN. */
+function summarize(matches, matchCount, totalCount, terms, noUsableTerms) {
   if (noUsableTerms) {
     return 'Could not extract any searchable keyword from that query — try a specific enzyme name, family, genus, acceptor class, donor, or metal ion.';
   }
-  if (matches.length === 0) {
+  if (matchCount === 0) {
     return `No records matched "${terms.join(', ')}" in the current filtered set. Try a different spelling or a broader term (e.g. an acceptor class or family name instead of a full sentence).`;
   }
   const plant = matches.filter((r) => r.origin === 'Plant').length;
@@ -1876,21 +1881,22 @@ function summarize(matches, totalCount, terms, noUsableTerms) {
   const topClass = mostCommon(matches.map((r) => r.acceptorClass));
   const topDonor = mostCommon(matches.flatMap((r) => r.allAcceptedDonors));
 
-  const bits = [`${matches.length} of ${totalCount} records match`];
+  const bits = [`${matchCount} of ${totalCount} records match`];
+  if (matches.length < matchCount) bits[0] += ` (showing top ${matches.length})`;
   bits.push(`${plant} plant, ${fungal} fungal`);
   if (topClass) bits.push(`most common acceptor class: ${topClass.value} (${topClass.count})`);
   if (topDonor) bits.push(`most common donor: ${topDonor.value} (${topDonor.count})`);
   return bits.join(' — ');
 }
 
-function searchRecords(question, records, topN = 20) {
-  const { matches, terms, noUsableTerms } = retrieveRelevantRecords(question, records, topN);
+function searchRecords(question, records, topN = 200) {
+  const { matches, matchCount, terms, noUsableTerms } = retrieveRelevantRecords(question, records, topN);
   return {
     ok: true,
-    summary: summarize(matches, records.length, terms, noUsableTerms),
+    summary: summarize(matches, matchCount, records.length, terms, noUsableTerms),
     matchedTerms: terms,
     totalCount: records.length,
-    matchCount: matches.length,
+    matchCount,
     records: matches.map((r) => ({
       id: r.id, enzyme: r.enzyme, origin: r.origin, family: r.family, genus: r.genus,
       acceptorClass: r.acceptorClass, primaryDonor: r.primaryDonor,
