@@ -1785,8 +1785,30 @@ function literature(records) {
 // Free, 100%-local smart search over the dataset — keyword retrieval with a
 // deterministic (non-AI) summary. No external API, no cost, no API key.
 
-const STOPWORDS = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'of', 'in', 'on', 'for', 'to', 'and', 'or',
-  'which', 'what', 'how', 'many', 'does', 'do', 'with', 'that', 'this', 'has', 'have', 'any', 'all', 'me', 'about']);
+// General English function/grammar words, plus domain-generic nouns that
+// carry zero discriminating power here because every single record is an
+// "enzyme" record (so the literal words "enzyme"/"accept"/"source" etc.
+// never usefully narrow anything, unlike a specific compound or family
+// name). Deliberately broad: a natural-language question ("enzymes that
+// accept X from Y sources") is mostly filler words around the 1-2 terms
+// that actually matter, and any filler word left in gets IDF-weighted
+// below -- if it happens to occur rarely in the free-text notes by
+// coincidence (as "from" originally did), it would be wrongly treated as
+// highly specific/important instead of being dropped as noise.
+const STOPWORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'of', 'in', 'on', 'for', 'to', 'from', 'by', 'at', 'as', 'into', 'onto', 'upon', 'via',
+  'over', 'under', 'between', 'among', 'across', 'after', 'before', 'during', 'since', 'until', 'without', 'within',
+  'and', 'or', 'nor', 'but', 'if', 'because', 'so', 'than', 'then', 'also',
+  'which', 'what', 'how', 'many', 'much', 'does', 'do', 'did', 'done', 'can', 'could', 'would', 'will', 'shall', 'should', 'may', 'might', 'must',
+  'with', 'that', 'this', 'these', 'those', 'there', 'here',
+  'has', 'have', 'had', 'any', 'all', 'both', 'each', 'every', 'either', 'neither', 'other', 'some', 'such', 'no', 'not',
+  'me', 'my', 'i', 'we', 'our', 'you', 'your', 'it', 'its', 'they', 'them', 'their', 'he', 'she', 'his', 'her', 'him',
+  'more', 'most', 'less', 'least', 'very', 'just', 'only', 'same', 'own', 'again', 'once', 'out', 'up', 'down', 'off', 'above', 'below',
+  'about', 'please', 'tell', 'show', 'list', 'find', 'give', 'get', 'know', 'let', 'want', 'need', 'looking', 'look',
+  'enzyme', 'enzymes', 'accept', 'accepts', 'accepted', 'accepting', 'source', 'sources',
+  'record', 'records', 'data', 'information', 'characterized', 'known', 'available', 'type', 'types',
+]);
 
 // Common Arabic domain terms mapped to the English tokens actually stored in
 // the dataset. The underlying records are all in English (enzyme names,
@@ -1834,27 +1856,53 @@ function recordSearchableText(r) {
  *  the query has real terms but none of them actually appear in any record.
  *  `matchCount` is the TRUE number of records that matched, before topN
  *  truncation -- callers must use that for "N of M match" reporting, not
- *  matches.length, or a truncated result silently undercounts itself. */
+ *  matches.length, or a truncated result silently undercounts itself.
+ *
+ *  Terms are matched as whole words (via each record's own tokenized text,
+ *  not a raw substring check -- so a short term like "ion" can't spuriously
+ *  match inside an unrelated word like "prenylation"), and weighted by
+ *  rarity (IDF-style: log(N / docFreq)) rather than counted equally. Without
+ *  that weighting, a multi-word natural-language question -- e.g. "enzymes
+ *  that accept orsellinic acid from fungal sources" -- would count a record
+ *  as a "match" for sharing just the single common word "fungal" (present in
+ *  roughly a quarter of the whole dataset) even if it has nothing to do with
+ *  orsellinic acid; a record only clears the relevance threshold below by
+ *  actually sharing enough of the query's more specific/rare terms. */
 function retrieveRelevantRecords(question, records, topN = 200) {
   const allTerms = tokenize(question);
-  const terms = allTerms.filter((t) => !STOPWORDS.has(t) && t.length > 1);
+  const terms = [...new Set(allTerms.filter((t) => !STOPWORDS.has(t) && t.length > 1))];
 
   if (terms.length === 0) {
     return { matches: [], matchCount: 0, terms: [], noUsableTerms: true };
   }
 
-  const scored = records.map((r) => {
-    const text = recordSearchableText(r);
+  const recordWordSets = records.map((r) => new Set(tokenize(recordSearchableText(r))));
+  const docFreq = new Map();
+  for (const term of terms) {
+    docFreq.set(term, recordWordSets.reduce((n, words) => n + (words.has(term) ? 1 : 0), 0));
+  }
+  // A term that occurs in zero records can never usefully narrow anything --
+  // dropped instead of being treated as an impossible-to-hit part of the
+  // theoretical maximum score, which would make the relevance threshold
+  // below unreachably strict.
+  const usableTerms = terms.filter((t) => docFreq.get(t) > 0);
+  if (usableTerms.length === 0) {
+    return { matches: [], matchCount: 0, terms, noUsableTerms: false };
+  }
+
+  const weight = new Map(usableTerms.map((t) => [t, Math.log((records.length + 1) / (docFreq.get(t) + 1)) + 0.1]));
+  const maxScore = usableTerms.reduce((sum, t) => sum + weight.get(t), 0);
+  const relevanceThreshold = maxScore * 0.3;
+
+  const scored = records.map((r, i) => {
     let score = 0;
-    for (const term of terms) {
-      if (text.includes(term)) score += 1;
-      if (r.enzyme && r.enzyme.toLowerCase() === term) score += 3;
-    }
+    for (const term of usableTerms) if (recordWordSets[i].has(term)) score += weight.get(term);
+    if (r.enzyme && usableTerms.includes(r.enzyme.toLowerCase())) score += 3;
     return { r, score };
   });
 
   scored.sort((a, b) => b.score - a.score);
-  const withHits = scored.filter((s) => s.score > 0);
+  const withHits = scored.filter((s) => s.score >= relevanceThreshold);
   return { matches: withHits.slice(0, topN).map((s) => s.r), matchCount: withHits.length, terms, noUsableTerms: false };
 }
 
