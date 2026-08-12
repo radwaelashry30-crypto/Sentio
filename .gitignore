@@ -68,6 +68,11 @@ gensim-data/
 # ONNX export output (optional, notebook-only; not shipped -- see requirements.txt)
 onnx_model/
 
+# enzyme-database/dist/ is the shipped single-file deliverable, not a build
+# artifact -- override the blanket "dist/" ignore above for this one path.
+!enzyme-database/dist/
+!enzyme-database/dist/*
+
 # OS
 .DS_Store
 Thumbs.db
