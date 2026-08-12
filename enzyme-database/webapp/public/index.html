@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prenyltransferase Atlas — Aromatic Prenyltransferases of Plants and Fungi</title>
+<script src="vendor/plotly.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div id="statusBar" class="status-bar" role="status" aria-live="polite">
+  <div class="status-left">
+    <span class="status-dot" id="statusDot" title="Processing state"></span>
+    <span id="statusText" class="mono">Connecting…</span>
+  </div>
+  <div class="status-right">
+    <span id="watchingBadge" class="badge watching" title="Backend is watching data/incoming for file changes">
+      <span class="pulse"></span> Watching for changes
+    </span>
+    <span id="sourceFileBadge" class="mono status-meta"></span>
+    <span id="versionBadge" class="mono status-meta"></span>
+    <span id="recordCountBadge" class="mono status-meta"></span>
+    <span id="refreshBadge" class="mono status-meta"></span>
+    <button id="uploadBtn" class="upload-btn">Upload / Replace Data</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+  </div>
+</div>
+<div id="uploadProgressWrap" class="upload-progress-wrap" hidden>
+  <div id="uploadProgressBar" class="upload-progress-bar"></div>
+  <span id="uploadProgressText" class="mono"></span>
+</div>
+<div id="toastRegion" class="toast-region" aria-live="assertive"></div>
+
+<header>
+  <div class="eyebrow">Merged interactive research dashboard · v3 · live data service</div>
+  <h1>Prenyltransferase Atlas</h1>
+  <div class="sub">A consolidated, publication-oriented analysis of characterized plant and fungal aromatic
+  prenyltransferases (PTs): substrate acceptance, regiochemistry, cofactor use, reaction conditions, and reported
+  kinetics, compiled from the primary literature. Every chart, table, and statistic below is computed live from the
+  currently loaded dataset — edit the source workbook or upload a new one and this page updates automatically.</div>
+  <div class="kpis" id="kpiRow"></div>
+  <div class="tabbar" id="tabbar">
+    <button class="tab-btn on" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="eda">EDA</button>
+    <button class="tab-btn" data-tab="cleaning">Data Cleaning &amp; Parsing</button>
+    <button class="tab-btn" data-tab="bivariate">Bivariate Analysis</button>
+    <button class="tab-btn" data-tab="stats">Statistical Analysis</button>
+    <button class="tab-btn" data-tab="insights">Biological Insights</button>
+    <button class="tab-btn" data-tab="literature">Literature Analysis</button>
+    <button class="tab-btn" data-tab="browser">Record Browser</button>
+    <button class="tab-btn" data-tab="ask">Ask the Data</button>
+    <button class="tab-btn" data-tab="addrecord">+ Add Record</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside id="filterSidebar" aria-label="Filters">
+    <div class="filter-toolbar">
+      <button id="clearAllBtn" class="chip-btn">Clear all</button>
+      <button id="undoFilterBtn" class="chip-btn">Undo last</button>
+      <button id="presetBtn" class="chip-btn">Save preset</button>
+    </div>
+    <div id="presetList" class="preset-list"></div>
+    <div id="activeChips" class="active-chips" aria-label="Active filters"></div>
+
+    <div class="filter-block">
+      <h4>Kingdom</h4>
+      <div class="seg-control" id="f-kingdom" role="group" aria-label="Kingdom">
+        <button data-value="Plant" class="seg-btn plant">Plant</button>
+        <button data-value="Fungal" class="seg-btn fungal">Fungal</button>
+        <button data-value="All" class="seg-btn on">All</button>
+      </div>
+    </div>
+
+    <div class="filter-block" data-filter="family"><h4>Family</h4><div class="multiselect" data-field="family"></div></div>
+    <div class="filter-block" data-filter="genus"><h4>Genus</h4><div class="multiselect" data-field="genus"></div></div>
+    <div class="filter-block" data-filter="species"><h4>Species</h4><div class="multiselect" data-field="species"></div></div>
+    <div class="filter-block" data-filter="acceptorClass"><h4>Acceptor class</h4><div class="multiselect" data-field="acceptorClass"></div></div>
+
+    <div class="filter-block">
+      <h4>Prenyl donor</h4>
+      <div class="seg-control small" id="f-donorRole">
+        <button data-value="primary" class="seg-btn">Primary only</button>
+        <button data-value="accepted" class="seg-btn on">All accepted</button>
+      </div>
+      <div class="multiselect" data-field="donor"></div>
+    </div>
+
+    <div class="filter-block" data-filter="metal"><h4>Metal ion / cofactor</h4><div class="multiselect" data-field="metal"></div></div>
+    <div class="filter-block" data-filter="regioPosition"><h4>Regio-position</h4><p class="cap" style="margin:0 0 6px;">Always paired with acceptor class — combine with the acceptor-class filter above for context (e.g. Flavonoid + C3 vs. Coumarin + C3 are distinct).</p><div class="multiselect" data-field="regioPosition"></div></div>
+    <div class="filter-block" data-filter="host"><h4>Expression host</h4><div class="multiselect" data-field="host"></div></div>
+    <div class="filter-block" data-filter="completeness"><h4>Data completeness</h4><div class="multiselect" data-field="completeness"></div></div>
+
+    <div class="filter-block">
+      <h4>Publication year</h4>
+      <input type="range" id="f-year-slider-from" min="1980" max="2026" class="year-slider">
+      <input type="range" id="f-year-slider-to" min="1980" max="2026" class="year-slider">
+      <div class="year-row"><input type="number" id="f-year-from" placeholder="from"><span>–</span><input type="number" id="f-year-to" placeholder="to"></div>
+    </div>
+
+    <div class="filter-block">
+      <h4>Special-case flags</h4>
+      <label class="checkbox-row"><input type="checkbox" id="f-promiscuous"> Promiscuous DMAPP acceptor</label>
+    </div>
+
+    <div class="filter-block"><h4>Search</h4><input type="text" id="f-search" placeholder="enzyme, organism, author, DOI…"></div>
+
+    <div class="filter-block">
+      <label class="checkbox-row"><input type="checkbox" id="f-includeMissing" checked> Include records with missing values</label>
+      <label class="checkbox-row"><input type="checkbox" id="f-entityCounts"> Parsed-entity counts (vs. record-level)</label>
+    </div>
+
+    <div class="filter-count" id="filterCount"></div>
+    <div class="filter-summary mono" id="filterSummary"></div>
+
+    <div class="export-row">
+      <a id="exportCsvBtn" class="reset-btn" href="#">Export filtered records (CSV)</a>
+    </div>
+
+    <div style="margin-top:16px;">
+      <span class="legend-chip"><span class="dot" style="background:var(--plant)"></span>Plant</span>
+      <span class="legend-chip"><span class="dot" style="background:var(--fungal)"></span>Fungal</span>
+      <span class="legend-chip"><span class="dot" style="background:var(--ink-faint)"></span>Neutral</span>
+      <span class="legend-chip"><span class="dot" style="background:var(--amber)"></span>Warning</span>
+      <span class="legend-chip"><span class="dot" style="background:var(--line-strong)"></span>Missing/Unknown</span>
+    </div>
+  </aside>
+
+  <main id="main">
+  <!-- ============ OVERVIEW ============ -->
+  <div class="page on" id="page-overview">
+    <section>
+      <div class="sec-head"><span class="sec-num">00</span><h2>Overview</h2></div>
+      <p class="sec-desc">Live status, dataset provenance, and high-level plant/fungal composition of the currently
+      loaded dataset. Use the sidebar to filter every chart, table, and statistic in every tab simultaneously.</p>
+
+      <div class="quick-links" id="quickLinks">
+        <button class="quick-link-btn" data-tab="eda">Explore charts →</button>
+        <button class="quick-link-btn" data-tab="bivariate">Bivariate analysis →</button>
+        <button class="quick-link-btn" data-tab="ask">Ask the data →</button>
+        <button class="quick-link-btn" data-tab="browser">Browse records →</button>
+      </div>
+
+      <div class="grid g3">
+        <div class="card">
+          <h3>Dataset status</h3>
+          <p class="cap">Source file, version, and validation state.</p>
+          <div id="overviewStatus" class="kv-table mono"></div>
+        </div>
+        <div class="card">
+          <h3>Activity log</h3>
+          <p class="cap">Latest refresh events (watcher and uploads).</p>
+          <ul id="activityLog" class="activity-log mono"></ul>
+        </div>
+        <div class="card">
+          <h3>Highlights</h3>
+          <p class="cap">Leaderboard-style top values, computed live — not stored numbers.</p>
+          <div id="overviewHighlights" class="kv-table mono"></div>
+        </div>
+      </div>
+      <div class="grid g3" id="overviewKpiCards" style="margin-top:16px;"></div>
+
+      <div class="card" id="overviewFlagsCard" style="margin-top:16px;">
+        <h3>Special-case flags</h3>
+        <p class="cap">Records that need extra care when reading the data — see the Data Cleaning &amp; Parsing tab for full detail.</p>
+        <div id="overviewFlags"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ EDA ============ -->
+  <div class="page" id="page-eda">
+    <section>
+      <div class="sec-head"><span class="sec-num">01</span><h2>Dataset composition</h2></div>
+      <p class="sec-desc">Distribution of records across kingdom, publication year, expression host, and taxonomic family.</p>
+      <div class="grid g3">
+        <div class="card"><h3>Records by kingdom</h3><p class="cap">Origin composition of the filtered set. Click a slice to filter.</p><div class="chart" id="c-origin" style="height:280px;"></div></div>
+        <div class="card"><h3>Records per year</h3><p class="cap">Annual publication count (not cumulative). Click a bar to filter.</p><div class="chart" id="c-yearbar" style="height:280px;"></div></div>
+        <div class="card"><h3>Expression host</h3><p class="cap">Heterologous / native system used to characterize the enzyme.</p><div class="chart" id="c-host" style="height:280px;"></div></div>
+      </div>
+      <div class="grid g2" style="margin-top:16px;">
+        <div class="card"><h3>Acceptor class — plant vs. fungal</h3><p class="cap">Normalized "Acceptor class" by kingdom. Click a bar to filter.</p><div class="chart" id="c-type" style="height:440px;"></div></div>
+        <div class="card"><h3>Taxonomic family composition (plant)</h3><p class="cap">Treemap of plant records by family — area encodes enzyme count.</p><div class="chart" id="c-famtree" style="height:440px;"></div></div>
+      </div>
+    </section>
+    <section>
+      <div class="sec-head"><span class="sec-num">02</span><h2>Prenyl donors</h2></div>
+      <p class="sec-desc">What each enzyme transfers: donor usage exploded from accepted-donor lists.</p>
+      <div class="grid g2">
+        <div class="card"><h3>Donor usage frequency</h3><p class="cap">Accepted-donor mentions across the filtered set.</p><div class="chart" id="c-donor" style="height:400px;"></div></div>
+        <div class="card"><h3>Donor usage by kingdom</h3><p class="cap">Same counts, split plant vs. fungal.</p><div class="chart" id="c-donorking" style="height:400px;"></div></div>
+      </div>
+    </section>
+    <section>
+      <div class="sec-head"><span class="sec-num">03</span><h2>Metal ions &amp; cofactors</h2></div>
+      <p class="sec-desc">Divalent-cation dependence, extracted from the accepted metal-ion field.</p>
+      <div class="grid g2">
+        <div class="card"><h3>Metal ion usage frequency</h3><p class="cap">Accepted-metal mentions (multi-valued cells exploded).</p><div class="chart" id="c-metal" style="height:360px;"></div></div>
+        <div class="card"><h3>Metal ion by kingdom</h3><p class="cap">Cofactor preference split by origin.</p><div class="chart" id="c-metalking" style="height:360px;"></div></div>
+      </div>
+    </section>
+    <section>
+      <div class="sec-head"><span class="sec-num">04</span><h2>Reaction conditions</h2></div>
+      <p class="sec-desc">The pH / temperature envelopes enzymes were characterized under, after plausibility-based
+      range/swap correction.</p>
+      <div class="grid g2">
+        <div class="card"><h3>Optimal pH distribution</h3><p class="cap">Box plot, plant vs. fungal.</p><div class="chart" id="c-ph" style="height:320px;"></div></div>
+        <div class="card"><h3>Optimal temperature distribution</h3><p class="cap">°C, plant vs. fungal.</p><div class="chart" id="c-temp" style="height:320px;"></div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head"><span class="sec-num">05</span><h2>Regiospecificity &amp; deeper cuts</h2></div>
+      <p class="sec-desc">Where prenylation occurs, how complete each record's characterization is, and how
+      reaction conditions relate to each other.</p>
+      <div class="grid g2">
+        <div class="card"><h3>C- vs O-prenylation by kingdom</h3><p class="cap">Regio tokens classified by leading C/O; free-text and unannotated regio fields are grouped as "Other / unspecified". Click a bar to filter.</p><div class="chart" id="c-regio" style="height:340px;"></div></div>
+        <div class="card"><h3>Optimal pH vs. temperature</h3><p class="cap">Each point is one enzyme with both values plausibility-validated, colored by kingdom.</p><div class="chart" id="c-phtemp" style="height:340px;"></div></div>
+      </div>
+      <div class="grid g2" style="margin-top:16px;">
+        <div class="card"><h3>Data completeness</h3><p class="cap">Share of records with a full pH + temperature + Km + donor profile vs. a partial one. Click a slice to filter.</p><div class="chart" id="c-completeness" style="height:300px;"></div></div>
+        <div class="card"><h3>Donor breadth</h3><p class="cap">Records by how many distinct prenyl donors they accept — a proxy for donor promiscuity.</p><div class="chart" id="c-donorbreadth" style="height:300px;"></div></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ DATA CLEANING & PARSING ============ -->
+  <div class="page" id="page-cleaning">
+    <section>
+      <div class="sec-head"><span class="sec-num">—</span><h2>Data Cleaning &amp; Text Parsing</h2></div>
+      <p class="sec-desc">The source spreadsheet stores most quantitative information as free-text lab notes inside
+      single cells. This pipeline (re-run on every upload and every watched-file change) converts that text into
+      analyzable numeric and categorical fields, and never invents a value it cannot parse.</p>
+
+      <div class="pipeline">
+        <div class="pipe-step"><h5>1 · Raw cell</h5><p>Multi-line free text per field (Km, pH, temperature, donor/acceptor/metal lists), source row preserved.</p></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><h5>2 · Validation</h5><p>Required columns, S. No. and Origin sanity-checked before anything is parsed.</p></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><h5>3 · Controlled-vocabulary explosion</h5><p>Donor/metal lists split on newline + comma against a fixed token whitelist; free text is kept as a note, never fabricated as a substrate.</p></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><h5>4 · Numeric extraction</h5><p>Km/pH/temperature parsed with unit conversion to µM and a standalone-number matcher that ignores digits glued to letters.</p></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><h5>5 · Plausibility correction</h5><p>pH outside 0–14 swapped with an in-range temperature value when both sides become plausible; logged, never silent.</p></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><h5>6 · Staged commit</h5><p>Only committed as the active dataset if the whole file validates; otherwise the last valid version is preserved.</p></div>
+      </div>
+
+      <h3 style="margin:26px 0 8px;">Normalization audit log</h3>
+      <p class="sec-desc">Every automatic correction made to the currently loaded dataset — acceptor-class
+      capitalization folds, pH/temperature swaps, and unrecognized donor/metal tokens retained as notes.</p>
+      <div class="table-wrap" style="max-height:360px;"><table class="data-table" id="auditTable"><thead><tr><th>Field</th><th>Row</th><th>Enzyme</th><th>Raw</th><th>Normalized</th><th>Rule</th></tr></thead><tbody></tbody></table></div>
+
+      <h3 style="margin:26px 0 8px;">Manual review list</h3>
+      <p class="sec-desc">Records flagged for domain-expert confirmation: heuristic promiscuous-DMAPP flags, the
+      AhPT1 cofactor-dependent override, auto-swapped pH/temperature pairs, and any structural oddities.</p>
+      <div class="table-wrap" style="max-height:360px;"><table class="data-table" id="reviewTable"><thead><tr><th>S. No.</th><th>Enzyme</th><th>Source row</th><th>Reason</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+
+  <!-- ============ BIVARIATE ============ -->
+  <div class="page" id="page-bivariate">
+    <section>
+      <div class="sec-head"><span class="sec-num">B1</span><h2>Kingdom-level bivariate analysis</h2></div>
+      <div class="grid g2">
+        <div class="card"><h3>Origin × Acceptor class</h3><p class="cap">Heatmap of enzyme counts by kingdom and acceptor class.</p><div class="chart" id="chart-kxa" style="height:520px;"></div></div>
+        <div class="card"><h3>Year × Origin (stacked)</h3><p class="cap">Annual record counts stacked by kingdom.</p><div class="chart" id="chart-yearstack" style="height:520px;"></div></div>
+      </div>
+      <div class="grid g1" style="margin-top:16px;">
+        <div class="card"><h3>Acceptor class × Regio-position</h3><p class="cap">Every cell is scoped to its own acceptor class — the same position (e.g. C3) under two different acceptor classes is never merged into one total. Records without a parseable regio position are excluded.</p><div class="chart" id="chart-regio" style="height:560px;"></div></div>
+      </div>
+    </section>
+    <section>
+      <div class="sec-head"><span class="sec-num">B2</span><h2>Plant-focused bivariate analysis</h2></div>
+      <div class="grid g1"><div class="card"><h3>Family × number of known enzymes</h3><div class="chart" id="chart-p-family-count" style="height:340px;"></div></div></div>
+      <div class="grid g2" style="margin-top:16px;">
+        <div class="card"><h3>Family × Acceptor class</h3><div class="chart" id="chart-p-family-acc" style="height:480px;"></div></div>
+        <div class="card"><h3>Family × Donor</h3><div class="chart" id="chart-p-family-don" style="height:480px;"></div></div>
+      </div>
+      <div class="grid g1" style="margin-top:16px;"><div class="card"><h3>Genus × number of known enzymes (top 30)</h3><div class="chart" id="chart-p-genus-count" style="height:420px;"></div></div></div>
+      <div class="grid g2" style="margin-top:16px;">
+        <div class="card"><h3>Genus × Acceptor class (top 30)</h3><div class="chart" id="chart-p-genus-acc" style="height:600px;"></div></div>
+        <div class="card"><h3>Genus × Donor (top 30)</h3><div class="chart" id="chart-p-genus-don" style="height:600px;"></div></div>
+      </div>
+    </section>
+    <section>
+      <div class="sec-head"><span class="sec-num">B3</span><h2>Fungal-focused bivariate analysis</h2></div>
+      <div class="grid g1"><div class="card"><h3>Family × number of known enzymes</h3><div class="chart" id="chart-f-family-count" style="height:340px;"></div></div></div>
+      <div class="grid g2" style="margin-top:16px;">
+        <div class="card"><h3>Genus × Acceptor class</h3><div class="chart" id="chart-f-genus-acc" style="height:520px;"></div></div>
+        <div class="card"><h3>Genus × Donor</h3><div class="chart" id="chart-f-genus-don" style="height:520px;"></div></div>
+      </div>
+    </section>
+    <section>
+      <div class="sec-head"><span class="sec-num">B4</span><h2>Kinetic profiling</h2></div>
+      <p class="sec-desc">Reported Michaelis constants for donor vs. acceptor substrates, log-scaled.</p>
+      <div class="grid g1"><div class="card"><h3>Donor K<sub>m</sub> vs. Acceptor K<sub>m</sub></h3><div class="chart" id="chart-km" style="height:520px;"></div></div></div>
+    </section>
+  </div>
+
+  <!-- ============ STATS ============ -->
+  <div class="page" id="page-stats">
+    <section>
+      <div class="sec-head"><span class="sec-num">S1</span><h2>Statistical Analysis</h2></div>
+      <p class="sec-desc">Recalculated from the active (filtered) dataset on every load and every refresh — nothing
+      here is a stored constant.</p>
+      <div class="grid g3" id="statsCards"></div>
+      <div class="grid g2" style="margin-top:16px;">
+        <div class="card"><h3>Optimal pH — summary</h3><div id="phSummary" class="kv-table mono"></div></div>
+        <div class="card"><h3>Optimal temperature — summary</h3><div id="tempSummary" class="kv-table mono"></div></div>
+      </div>
+      <div class="grid g1" style="margin-top:16px;"><div class="card"><h3>Missingness</h3><div id="missingSummary" class="kv-table mono"></div></div></div>
+    </section>
+  </div>
+
+  <!-- ============ INSIGHTS ============ -->
+  <div class="page" id="page-insights">
+    <section>
+      <div class="sec-head"><span class="sec-num">I1</span><h2>Biological Insights</h2></div>
+      <p class="sec-desc">Data-grounded computed observations from the current dataset — labeled explicitly as
+      computed, not as literature-verified claims.</p>
+      <div id="insightsList"></div>
+    </section>
+  </div>
+
+  <!-- ============ LITERATURE ============ -->
+  <div class="page" id="page-literature">
+    <section>
+      <div class="sec-head"><span class="sec-num">L1</span><h2>Literature Analysis</h2></div>
+      <div class="grid g1"><div class="card"><h3>Publications per year</h3><div class="chart" id="c-litTrend" style="height:300px;"></div></div></div>
+      <div class="table-wrap" style="max-height:520px; margin-top:16px;">
+        <table class="data-table" id="literatureTable"><thead><tr><th>Enzyme</th><th>Origin</th><th>Author / Year</th><th>DOI</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ RECORD BROWSER ============ -->
+  <div class="page" id="page-browser">
+    <section>
+      <div class="sec-head"><span class="sec-num">R1</span><h2>Record Browser</h2></div>
+      <p class="sec-desc">Sortable, searchable, paginated view of every field, raw and normalized. Expand a row for
+      parsed donor/acceptor/metal/regio entities, quality warnings, and the DOI link.</p>
+      <div class="browser-toolbar">
+        <span id="browserCount" class="mono"></span>
+        <div class="pager">
+          <button id="prevPage" class="chip-btn">◀ Prev</button>
+          <span id="pageInfo" class="mono"></span>
+          <button id="nextPage" class="chip-btn">Next ▶</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="max-height:640px;">
+        <table class="data-table" id="browserTable">
+          <thead><tr>
+            <th data-sort="id">S.No</th><th data-sort="enzyme">Enzyme</th><th data-sort="origin">Origin</th>
+            <th data-sort="family">Family</th><th data-sort="acceptorClass">Acceptor class</th>
+            <th data-sort="primaryDonor">Primary donor</th><th data-sort="year">Year</th>
+            <th data-sort="dataCompleteness">Completeness</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ ASK THE DATA (free keyword search) ============ -->
+  <div class="page" id="page-ask">
+    <section>
+      <div class="sec-head"><span class="sec-num">A1</span><h2>Ask the Data</h2></div>
+      <p class="sec-desc">Type a question or a few keywords in plain language. This searches every field of the
+      currently filtered dataset (enzyme, organism, family, acceptor class, donors, metals, host, author, DOI) and
+      ranks records by relevance — entirely local, no external API, no cost. The summary line below the results is
+      computed directly from the matches (counts, most common class/donor), not AI-generated text.</p>
+      <div class="card">
+        <div class="ask-row">
+          <input type="text" id="askInput" placeholder="e.g. FPP donor fungal metal ion" maxlength="500">
+          <button id="askBtn" class="upload-btn">Search</button>
+        </div>
+        <div id="askStatus" class="mono" style="margin-top:8px; font-size:12px; color:var(--ink-soft);"></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>Matching records</h3>
+        <p class="cap">Click a row to jump to it in the Record Browser.</p>
+        <div id="askRetrieved"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ ADD RECORD ============ -->
+  <div class="page" id="page-addrecord">
+    <section>
+      <div class="sec-head"><span class="sec-num">+</span><h2>Add a New Enzyme Record</h2></div>
+      <p class="sec-desc">Enter one enzyme's data directly — it's appended to the existing dataset (not a
+      replacement) and goes through the exact same validation and normalization pipeline as an uploaded file, so it
+      gets a new S. No., shows up in every chart and filter immediately, and is included in the next report.</p>
+      <form id="addRecordForm" class="card add-record-form">
+        <div class="grid g2">
+          <div class="field"><label>Enzyme name *</label><input type="text" id="ar-enzyme" required placeholder="e.g. XyPT1"></div>
+          <div class="field"><label>Origin *</label>
+            <select id="ar-origin" required><option value="">Select…</option><option value="P">Plant</option><option value="F">Fungal</option></select>
+          </div>
+          <div class="field"><label>Family</label><input type="text" id="ar-family" placeholder="e.g. Fabaceae"></div>
+          <div class="field"><label>Organism (genus species)</label><input type="text" id="ar-organism" placeholder="e.g. Glycine max (Soy bean)"></div>
+          <div class="field"><label>Acceptor class</label><input type="text" id="ar-acceptorClass" placeholder="e.g. Flavonoid"></div>
+          <div class="field"><label>Expression host</label><input type="text" id="ar-expressionHost" placeholder="e.g. Yeast"></div>
+        </div>
+
+        <h4 class="form-subhead">Substrates &amp; cofactors</h4>
+        <div class="grid g2">
+          <div class="field"><label>Accepted aromatic acceptor(s)</label><textarea id="ar-acceptorAccepted" rows="2" placeholder="one per line"></textarea></div>
+          <div class="field"><label>Medium / not-accepted acceptor(s)</label><textarea id="ar-acceptorMedium" rows="2" placeholder="one per line"></textarea></div>
+          <div class="field"><label>Accepted donor(s)</label><input type="text" id="ar-donorAccepted" placeholder="e.g. DMAPP, GPP"></div>
+          <div class="field"><label>Medium / not-accepted donor(s)</label><input type="text" id="ar-donorMedium" placeholder="e.g. FPP, GGPP"></div>
+          <div class="field"><label>Accepted metal ion(s)</label><input type="text" id="ar-metalAccepted" placeholder="e.g. Mg2+, Mn2+"></div>
+          <div class="field"><label>Medium / not-accepted metal ion(s)</label><input type="text" id="ar-metalMedium" placeholder="e.g. Ca2+"></div>
+        </div>
+
+        <h4 class="form-subhead">Reaction details</h4>
+        <div class="grid g2">
+          <div class="field"><label>Product</label><input type="text" id="ar-product" placeholder="e.g. 3-geranyl-4-hydroxybenzoic acid"></div>
+          <div class="field"><label>Regio specificity</label><input type="text" id="ar-regio" placeholder="e.g. C3"></div>
+          <div class="field"><label>Km value(s)</label><textarea id="ar-km" rows="2" placeholder="e.g. DMAPP: 150 µM"></textarea></div>
+          <div class="field"><label>Optimal pH</label><input type="text" id="ar-ph" placeholder="e.g. 7.5"></div>
+          <div class="field"><label>Optimal temperature</label><input type="text" id="ar-temperature" placeholder="e.g. 30°C"></div>
+          <div class="field"><label>Year</label><input type="number" id="ar-year" placeholder="e.g. 2024"></div>
+        </div>
+
+        <h4 class="form-subhead">Reference</h4>
+        <div class="grid g2">
+          <div class="field"><label>Author</label><input type="text" id="ar-author" placeholder="e.g. Smith et al., 2024"></div>
+          <div class="field"><label>DOI</label><input type="text" id="ar-doi" placeholder="e.g. https://doi.org/..."></div>
+        </div>
+
+        <div class="add-record-actions">
+          <button type="submit" id="addRecordSubmit" class="upload-btn">Add record</button>
+          <button type="button" id="addRecordClear" class="chip-btn">Clear form</button>
+          <span id="addRecordStatus" class="mono" style="font-size:12px;"></span>
+        </div>
+      </form>
+    </section>
+  </div>
+  </main>
+</div>
+
+<footer>Prenyltransferase Atlas · Live data service · Source: uploaded/watched workbook, not embedded in this page</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

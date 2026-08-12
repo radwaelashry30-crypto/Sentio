@@ -1,14 +1,37 @@
-# Enzyme Database — single-file dashboard (no server, no hosting)
+# Enzyme Database
 
-A single self-contained HTML page for browsing, filtering, and extending the
-plant/fungal prenyltransferase (PT) enzyme dataset. Everything runs in the
-browser — there is no backend, no build step to run it, and no data leaves
-the page except when you explicitly export a file.
+Two ways to browse, filter, and extend the plant/fungal prenyltransferase
+(PT) enzyme dataset. Neither is deployed/published anywhere — both are for
+running privately, either on your own machine or as a standalone file.
+
+## [`webapp/`](webapp/) — the full dashboard (recommended)
+
+The complete dashboard, all tabs and analyses: Overview, EDA, Data Cleaning
+& Parsing, Bivariate Analysis, Statistical Analysis, Biological Insights,
+Literature Analysis, Record Browser, Ask the Data, + Add Record. Runs
+locally via `npm start` (`cd webapp && npm install && npm start`, then open
+`http://localhost:5173`) — a real backend with a filesystem watcher,
+live-updating charts, and file upload, but **only reachable on your own
+machine** unless you deliberately deploy it yourself. See
+[`webapp/README.md`](webapp/README.md) for full details.
+
+## [`dist/enzyme-database.html`](dist/enzyme-database.html) — single-file fallback
+
+A lighter alternative with no install step at all: one self-contained HTML
+file, open it by double-clicking, no server, no `npm install`. Fewer
+analysis tabs than `webapp/` (no bivariate/statistical/literature views),
+but the same core filtering, family/genus/compound breakdowns, typo
+detection, add-record form, and Excel/CSV export. Useful if you want to
+hand someone a single file with zero setup instead of running a server.
+
+---
+
+## `dist/` details
 
 **Open it**: double-click [`dist/enzyme-database.html`](dist/enzyme-database.html),
 or drop it on any static file host. It works straight from `file://`.
 
-## What it does
+### What it does
 
 - Loads the bundled baseline dataset (185 records from
   `data/List of PTs_20260806_plant and fungal.xlsx`) automatically on open.
@@ -37,7 +60,7 @@ or drop it on any static file host. It works straight from `file://`.
   dataset (baseline + everything you've added) in the same column layout as
   the source workbook.
 
-## Persistence
+### Persistence
 
 Because there is no server, added/edited records are kept in this browser's
 `localStorage` (key `enzymeDb.rows.v1`) so they survive a page reload. They
@@ -45,7 +68,7 @@ are **not** synced anywhere else — if you switch browsers/machines, or clear
 site data, export a file first. **Clear data** wipes local storage and
 reverts to the bundled baseline dataset.
 
-## Expected column layout
+### Expected column layout
 
 Same headers as the source PT workbook (order-independent):
 
@@ -59,7 +82,7 @@ Expression in | Product | Regio specificity | Km value |
 Optimal pH | Optimal temperature | Year | Author | doi
 ```
 
-## Rebuilding after an edit
+### Rebuilding after an edit
 
 Source files live in `src/` (`index.html`, `app.js`, `styles.css`) plus
 `vendor/xlsx.full.min.js` and `src/data.json` (the bundled baseline dataset,
@@ -86,7 +109,7 @@ node build.js
 (The `xlsx` npm package is only needed locally to run this one-off
 regeneration script — the shipped page itself needs no build tooling.)
 
-## Known limitations vs. the earlier live-server dashboard (`pt-dashboard`)
+### Known limitations vs. the earlier live-server dashboard (`pt-dashboard`)
 
 This was deliberately built as a static, no-hosting alternative, so a few
 things are traded off on purpose:
@@ -109,7 +132,7 @@ things are traded off on purpose:
   that happen to be a couple of letters apart). Always verify before editing
   the source data.
 
-## Dependency note
+### Dependency note
 
 Bundles SheetJS's `xlsx` package **from the public npm registry** (currently
 carries two disclosed advisories — prototype pollution and ReDoS — that

@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: prenyltransferase-atlas-dashboard
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.5.0

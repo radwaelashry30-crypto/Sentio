@@ -1,0 +1,12 @@
+node_modules/
+.env
+
+data/canonical/*.sqlite
+data/canonical/*.sqlite-wal
+data/canonical/*.sqlite-shm
+data/uploads/*
+!data/uploads/.gitkeep
+data/incoming/*
+!data/incoming/.gitkeep
+data/reports/*
+!data/reports/.gitkeep

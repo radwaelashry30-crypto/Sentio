@@ -1,0 +1,25 @@
+{
+  "name": "prenyltransferase-atlas-dashboard",
+  "version": "2.0.0",
+  "description": "Production dashboard for the Prenyltransferase Atlas (plant and fungal aromatic PTs) with live Excel/CSV ingestion, filesystem watching, and WebSocket-pushed updates.",
+  "type": "commonjs",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/*.test.js",
+    "report": "node scripts/generate-report.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "csv-parse": "^5.5.6",
+    "csv-stringify": "^6.5.1",
+    "express": "^4.19.2",
+    "multer": "^2.0.1",
+    "ws": "^8.18.0",
+    "xlsx": "^0.18.5"
+  }
+}
