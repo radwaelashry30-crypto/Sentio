@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 'use strict';
 // Regenerates src/data.json (the dataset baked into the page as the default
-// on first open) from a source .xlsx/.csv workbook. Run `node build.js`
+// on first open) from a source .xlsx/.csv workbook. Run `node full/build.js`
 // afterwards to fold the new data.json into dist/enzyme-database.html.
 //
-// Usage: node regen-data.js "data/YOUR_FILE.xlsx"
+// Usage: node full/regen-data.js "data/YOUR_FILE.xlsx"   (run from enzyme-database/)
 // Requires the `xlsx` npm package installed locally (only for this one-off
 // script — the shipped page itself needs no build tooling).
 
@@ -35,6 +35,6 @@ const cleaned = rows
   .map((r) => { const out = {}; REQUIRED_COLUMNS.forEach((c) => { out[c] = r[c] === undefined ? null : r[c]; }); return out; })
   .filter((r) => r['Enzyme'] || r['S. No.']);
 
-const outPath = path.join(__dirname, 'src', 'data.json');
+const outPath = path.join(__dirname, '..', 'src', 'data.json');
 fs.writeFileSync(outPath, JSON.stringify(cleaned));
-console.log(`Wrote ${cleaned.length} rows to ${outPath}. Now run: node build.js`);
+console.log(`Wrote ${cleaned.length} rows to ${outPath}. Now run: node full/build.js`);
