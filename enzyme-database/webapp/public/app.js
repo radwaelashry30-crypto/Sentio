@@ -873,11 +873,14 @@ async function renderBrowser() {
       <td>${escapeHtml(r.family || '')}</td><td>${escapeHtml(r.acceptorClass || '')}</td>
       <td>${escapeHtml(r.primaryDonor || '')}</td><td>${r.year ?? ''}</td>
       <td>${escapeHtml(r.dataCompleteness || '')}</td>
-      <td><button class="expand-btn" data-id="${r.id}">Details</button></td>
+      <td><button class="expand-btn" data-id="${r.id}">Details</button> <button class="chip-btn edit-record-btn" data-id="${r.id}">Edit</button></td>
     </tr>
   `).join('');
   tbody.querySelectorAll('.expand-btn').forEach((btn) => {
     btn.addEventListener('click', () => toggleDetailRow(btn));
+  });
+  tbody.querySelectorAll('.edit-record-btn').forEach((btn) => {
+    btn.addEventListener('click', () => startEditRecord(Number(btn.dataset.id)));
   });
 }
 
@@ -975,13 +978,62 @@ async function askTheData(question) {
 }
 
 /* =========================================================================
-   Add Record
+   Add / Edit Record
    ========================================================================= */
 const ADD_RECORD_FIELDS = [
   'enzyme', 'origin', 'family', 'organism', 'acceptorClass', 'expressionHost',
   'acceptorAccepted', 'acceptorMedium', 'donorAccepted', 'donorMedium', 'metalAccepted', 'metalMedium',
   'product', 'regio', 'km', 'ph', 'temperature', 'year', 'author', 'doi',
 ];
+
+// Same field -> source-workbook-column mapping the server uses (server/routes/records.js
+// FORM_FIELD_TO_COLUMN) -- needed here only to populate the form from a record's raw
+// values when editing; the server is still the one source of truth for writes.
+const FORM_FIELD_COLUMNS = {
+  enzyme: 'Enzyme', acceptorClass: 'Acceptor class', family: 'Family', origin: 'Origin',
+  organism: 'Gene from organism',
+  acceptorAccepted: 'Prenyl acceptor (Aromatic substrate) - Accepted',
+  acceptorMedium: 'Prenyl acceptor (Aromatic substrate) - Medium to Not Accepted',
+  donorAccepted: 'Prenyl donor - Accepted', donorMedium: 'Prenyl donor - Medium to Not Accepted',
+  metalAccepted: 'Metal ion - Accepted', metalMedium: 'Metal ion - Medium to Not Accepted',
+  expressionHost: 'Expression in', product: 'Product', regio: 'Regio specificity', km: 'Km value',
+  ph: 'Optimal pH', temperature: 'Optimal temperature', year: 'Year', author: 'Author', doi: 'doi',
+};
+
+const ADD_RECORD_DESC_ADD = `Enter one enzyme's data directly — it's appended to the existing dataset (not a
+  replacement) and goes through the exact same validation and normalization pipeline as an uploaded file, so it
+  gets a new S. No., shows up in every chart and filter immediately, and is included in the next report. Click
+  <strong>Edit</strong> on any row in the Record Browser to fix a single field on an existing record instead —
+  no need to re-upload the whole file for a one-cell correction.`;
+const ADD_RECORD_DESC_EDIT = `Editing an existing record in place — this replaces its current values (still going
+  through the exact same validation and normalization pipeline), it does not create a new S. No. Click
+  <strong>Cancel edit</strong> to discard these changes and go back to adding a new record instead.`;
+
+function endEditMode() {
+  document.getElementById('ar-editId').value = '';
+  document.getElementById('addRecordHeading').textContent = 'Add a New Enzyme Record';
+  document.getElementById('addRecordSubmit').textContent = 'Add record';
+  document.getElementById('addRecordCancelEdit').hidden = true;
+  document.getElementById('addRecordDesc').innerHTML = ADD_RECORD_DESC_ADD;
+}
+
+async function startEditRecord(id) {
+  const { record, raw } = await fetch(`/api/records/${id}`).then((r) => r.json());
+  if (!record || !raw) { toast(`Could not load record S.No ${id} for editing.`, 'error'); return; }
+  switchTab('addrecord');
+  document.getElementById('ar-editId').value = id;
+  document.getElementById('addRecordHeading').textContent = `Edit Enzyme Record — S.No ${id}`;
+  document.getElementById('addRecordSubmit').textContent = 'Save changes';
+  document.getElementById('addRecordCancelEdit').hidden = false;
+  document.getElementById('addRecordDesc').innerHTML = ADD_RECORD_DESC_EDIT;
+  ADD_RECORD_FIELDS.forEach((f) => {
+    let val = raw[FORM_FIELD_COLUMNS[f]];
+    if (f === 'origin') val = (val || '').toString().trim().toUpperCase();
+    document.getElementById(`ar-${f}`).value = val == null ? '' : val;
+  });
+  document.getElementById('addRecordStatus').textContent = `Editing S.No ${id} — change only the field(s) you need, the rest are pre-filled as-is.`;
+  document.getElementById('addRecordStatus').style.color = 'var(--ink-soft)';
+}
 
 function initAddRecordForm() {
   const form = document.getElementById('addRecordForm');
@@ -992,13 +1044,15 @@ function initAddRecordForm() {
     e.preventDefault();
     const body = {};
     ADD_RECORD_FIELDS.forEach((f) => { body[f] = document.getElementById(`ar-${f}`).value.trim(); });
+    const editId = document.getElementById('ar-editId').value;
 
     submitBtn.disabled = true;
-    statusEl.textContent = 'Adding record…';
+    statusEl.textContent = editId ? 'Saving changes…' : 'Adding record…';
     statusEl.style.color = 'var(--ink-soft)';
 
     try {
-      const resp = await fetch('/api/records/add', {
+      const url = editId ? `/api/records/${editId}/update` : '/api/records/add';
+      const resp = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       const data = await resp.json();
@@ -1007,10 +1061,16 @@ function initAddRecordForm() {
         statusEl.style.color = 'var(--red)';
         return;
       }
-      statusEl.textContent = `Added as S.No ${data.newSno} — dataset now v${data.version}, ${data.recordCount} records.`;
+      if (editId) {
+        statusEl.textContent = `Saved — S.No ${editId} updated, dataset now v${data.version}, ${data.recordCount} records.`;
+        toast(`Record S.No ${editId} updated.`);
+      } else {
+        statusEl.textContent = `Added as S.No ${data.newSno} — dataset now v${data.version}, ${data.recordCount} records.`;
+        toast(`New record added (S.No ${data.newSno}).`);
+      }
       statusEl.style.color = 'var(--success)';
       form.reset();
-      toast(`New record added (S.No ${data.newSno}).`);
+      endEditMode();
     } catch (err) {
       statusEl.textContent = `Network error: ${err.message}`;
       statusEl.style.color = 'var(--red)';
@@ -1021,6 +1081,11 @@ function initAddRecordForm() {
 
   document.getElementById('addRecordClear').addEventListener('click', () => {
     form.reset();
+    statusEl.textContent = '';
+  });
+  document.getElementById('addRecordCancelEdit').addEventListener('click', () => {
+    form.reset();
+    endEditMode();
     statusEl.textContent = '';
   });
 }

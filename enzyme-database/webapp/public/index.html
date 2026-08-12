@@ -393,11 +393,14 @@
   <!-- ============ ADD RECORD ============ -->
   <div class="page" id="page-addrecord">
     <section>
-      <div class="sec-head"><span class="sec-num">+</span><h2>Add a New Enzyme Record</h2></div>
-      <p class="sec-desc">Enter one enzyme's data directly — it's appended to the existing dataset (not a
+      <div class="sec-head"><span class="sec-num">+</span><h2 id="addRecordHeading">Add a New Enzyme Record</h2></div>
+      <p class="sec-desc" id="addRecordDesc">Enter one enzyme's data directly — it's appended to the existing dataset (not a
       replacement) and goes through the exact same validation and normalization pipeline as an uploaded file, so it
-      gets a new S. No., shows up in every chart and filter immediately, and is included in the next report.</p>
+      gets a new S. No., shows up in every chart and filter immediately, and is included in the next report. Click
+      <strong>Edit</strong> on any row in the Record Browser to fix a single field on an existing record instead —
+      no need to re-upload the whole file for a one-cell correction.</p>
       <form id="addRecordForm" class="card add-record-form">
+        <input type="hidden" id="ar-editId" value="">
         <div class="grid g2">
           <div class="field"><label>Enzyme name *</label><input type="text" id="ar-enzyme" required placeholder="e.g. XyPT1"></div>
           <div class="field"><label>Origin *</label>
@@ -438,6 +441,7 @@
         <div class="add-record-actions">
           <button type="submit" id="addRecordSubmit" class="upload-btn">Add record</button>
           <button type="button" id="addRecordClear" class="chip-btn">Clear form</button>
+          <button type="button" id="addRecordCancelEdit" class="chip-btn" hidden>Cancel edit</button>
           <span id="addRecordStatus" class="mono" style="font-size:12px;"></span>
         </div>
       </form>

@@ -88,6 +88,60 @@ router.post('/add', express.json(), async (req, res) => {
   }
 });
 
+// Edits ONE existing record in place (e.g. fixing a single wrong donor/family
+// value) instead of requiring a full replacement upload. Goes through the
+// same validate -> normalize -> commit pipeline as /add and file uploads, so
+// the corrected value is re-parsed exactly like any other cell.
+router.post('/:id/update', express.json(), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: 'Invalid record id.' });
+  const body = req.body || {};
+  const enzyme = (body.enzyme || '').trim();
+  const origin = (body.origin || '').trim().toUpperCase();
+  if (!enzyme) return res.status(400).json({ ok: false, error: 'Enzyme name is required.' });
+  if (origin !== 'P' && origin !== 'F') return res.status(400).json({ ok: false, error: 'Origin must be Plant or Fungal.' });
+
+  try {
+    const existingRows = getActiveRawRows();
+    const idx = existingRows.findIndex((r) => Number(r['S. No.']) === id);
+    if (idx === -1) return res.status(404).json({ ok: false, error: `No record with S. No. ${id}.` });
+
+    const updatedRow = { ...existingRows[idx] };
+    for (const [formField, column] of Object.entries(FORM_FIELD_TO_COLUMN)) {
+      const val = body[formField];
+      updatedRow[column] = (val == null || String(val).trim() === '') ? null : val;
+    }
+    updatedRow['Origin'] = origin;
+    updatedRow['Enzyme'] = enzyme;
+
+    const allRows = [...existingRows];
+    allRows[idx] = updatedRow;
+    const aoa = [REQUIRED_COLUMNS, ...allRows.map((r) => REQUIRED_COLUMNS.map((col) => r[col] ?? null))];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tabelle1');
+
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const tempPath = path.join(uploadsDir, `${stamp}__manual-edit-sno${id}.xlsx`);
+    XLSX.writeFile(wb, tempPath);
+
+    const result = await ingestFile(tempPath, path.basename(tempPath), (stage) => store.setStage(stage));
+    store.applyNewVersion(result);
+    res.json({
+      ok: true, version: result.version, recordCount: result.recordCount, updatedSno: id,
+      refreshedAt: store.state.lastRefreshAt,
+    });
+  } catch (err) {
+    if (err instanceof IngestError) {
+      store.setError(err.message, err.details);
+      return res.status(422).json({ ok: false, error: err.message, details: err.details });
+    }
+    store.setError(err.message, []);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 function paginate(records, req) {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(500, Math.max(1, Number(req.query.pageSize) || 50));

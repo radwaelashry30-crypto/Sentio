@@ -239,6 +239,52 @@ function handleAddRecord(body) {
   }
 }
 
+// Edits ONE existing record in place -- mirrors server/routes/records.js's
+// POST /:id/update. Lets you fix a single field (e.g. one wrong donor value)
+// without re-uploading the whole workbook.
+function handleUpdateRecord(id, body) {
+  body = body || {};
+  const enzyme = (body.enzyme || '').trim();
+  const origin = (body.origin || '').trim().toUpperCase();
+  if (!enzyme) return jsonResponse({ ok: false, error: 'Enzyme name is required.' }, 400);
+  if (origin !== 'P' && origin !== 'F') return jsonResponse({ ok: false, error: 'Origin must be Plant or Fungal.' }, 400);
+
+  try {
+    const existingRows = AppDB.state.rawRows;
+    const idx = existingRows.findIndex((r) => Number(r['S. No.']) === id);
+    if (idx === -1) return jsonResponse({ ok: false, error: `No record with S. No. ${id}.` }, 404);
+
+    const updatedRow = { ...existingRows[idx] };
+    for (const [formField, column] of Object.entries(FORM_FIELD_TO_COLUMN)) {
+      const val = body[formField];
+      updatedRow[column] = val == null || String(val).trim() === '' ? null : val;
+    }
+    updatedRow['Origin'] = origin;
+    updatedRow['Enzyme'] = enzyme;
+
+    const allRows = [...existingRows];
+    allRows[idx] = updatedRow;
+    const validation = validateWorkbook({ headers: REQUIRED_COLUMNS, rows: allRows });
+    if (!validation.ok) throw new IngestError('File failed structural validation.', validation.errors);
+    const { records, auditLog, manualReview } = normalizeDataset(allRows);
+
+    const version = AppDB.commitVersion({
+      fileHash: simpleHash(JSON.stringify(allRows)),
+      sourceFilename: AppDB.state.meta?.source_filename || 'manual-entry',
+      rawRows: allRows, records, auditLog, manualReview,
+    });
+    Store.applyNewVersion({ version });
+    return jsonResponse({ ok: true, version, recordCount: records.length, updatedSno: id, refreshedAt: Store.state.lastRefreshAt });
+  } catch (err) {
+    if (err instanceof IngestError) {
+      Store.setError(err.message, err.details);
+      return jsonResponse({ ok: false, error: err.message, details: err.details }, 422);
+    }
+    Store.setError(err.message, []);
+    return jsonResponse({ ok: false, error: err.message }, 500);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // fetch() shim -- routes /api/* the same way server/routes/*.js did, computed
 // synchronously off Store.state. Everything else (Google Fonts, etc.) passes
@@ -317,6 +363,8 @@ window.fetch = async function shimFetch(input, init) {
       return jsonResponse({ record: rec, raw });
     }
     if (path === '/api/records/add' && method === 'POST') return handleAddRecord(JSON.parse(init.body));
+    const updateMatch = path.match(/^\/api\/records\/(\d+)\/update$/);
+    if (updateMatch && method === 'POST') return handleUpdateRecord(Number(updateMatch[1]), JSON.parse(init.body));
 
     if (path === '/api/analysis/bivariate' && method === 'GET') return jsonResponse(allBivariate(applyFilters(Store.state.records, query)));
     if (path === '/api/analysis/stats' && method === 'GET') return jsonResponse(statisticalAnalysis(applyFilters(Store.state.records, query)));

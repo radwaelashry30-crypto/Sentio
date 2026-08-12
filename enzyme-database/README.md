@@ -20,6 +20,7 @@ It has the **full feature set** of the original live-server dashboard
 - **Record Browser** — sortable, paginated, click-to-expand full detail per record.
 - **Ask the Data** — free local keyword search (English + a small Arabic term bridge), no external API.
 - **+ Add Record** — a form that appends one new enzyme record at a time, going through the exact same validation/normalization pipeline as a file upload.
+- **Edit** (per row in Record Browser) — fix a single field on an existing record in place (e.g. one wrong donor value) without re-uploading or re-adding the whole record; opens the same form pre-filled, submits as "Save changes" instead of "Add record".
 - **Upload / Replace Data** — load a different .xlsx/.csv entirely.
 - **Export Full Workbook (.xlsx)** and **Export filtered records (CSV)** — get your data back out, including anything you've added.
 
