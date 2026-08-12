@@ -36,10 +36,19 @@ html = html.replace(
   () => `<script>\n${noScriptClose(plotlyJs)}\n</script>`
 );
 
-// 2) Replace the external stylesheet link with an inline <style>.
+// 2) Replace the external stylesheet link with an inline <style>. Also
+//    appends a small override: the original .tabbar scrolls horizontally
+//    with a hidden scrollbar (scrollbar-width:none / ::-webkit-scrollbar
+//    {display:none}), so on a narrower window the last tab(s) -- including
+//    "+ Add Record" -- end up scrolled off-screen with no visual hint they
+//    exist. Wrapping instead of hidden-overflow keeps every tab visible at
+//    any window width.
+const tabbarFixCss = `
+.tabbar{flex-wrap:wrap; overflow-x:visible;}
+`;
 html = html.replace(
   '<link rel="stylesheet" href="styles.css">',
-  () => `<style>\n${css}\n</style>`
+  () => `<style>\n${css}\n${tabbarFixCss}\n</style>`
 );
 
 // 3) Replace the app.js <script src> with: xlsx vendor, ported server logic,
